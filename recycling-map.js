@@ -17,15 +17,21 @@ L.RecyclingIcon = L.SegmentedCircleIcon.extend({
   initialize: function (options) {
     options.segments = this._generateSegmentsFromTypes(options.types)
     options.className = 'segmented-circle-icon'
+    // console.log(options.segments);
     let segmentCount = options.segments.length
     options.className += ` segmented-circle-icon--${segmentCount}-segments`
     L.SegmentedCircleIcon.prototype.initialize.call(this, options)
   },
-  _generateSegmentsFromTypes: (types) => types.map((type) => {
-    return {
-      className: `segment segment--${type}`
-    }
-  })
+  _generateSegmentsFromTypes: (types) => {
+    let keys = Object.keys(types)
+    console.log(types, keys);
+    return keys.map(type => {
+      return {
+        className: `segment segment--${type}`,
+        weight: types[type]
+      }
+    })
+  }
 })
 L.recyclingIcon = (coords, options) => {
   return new L.RecyclingIcon(coords, options)
@@ -35,7 +41,7 @@ L.RecyclingMarker = L.Marker.extend({
   initialize: function (coords, options) {
     options.icon = L.recyclingIcon({
       types: options.types,
-      radius: 12
+      radius: options.radius || 12
     })
     L.Marker.prototype.initialize.call(this, coords, options)
   }
@@ -47,8 +53,8 @@ L.recyclingMarker = (coords, options) => {
 const renderMap = ({elements, generator, osm3s}) => {
 
   const recyclingMap = L.map('recycling-map').setView([51.46, 7.02], 13)
-  // L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png', {
+  L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  // L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png', {
     attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, <a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, Imagery © <a href="http://mapbox.com">Mapbox</a>',
     maxZoom: 18
   }).addTo(recyclingMap)
@@ -73,7 +79,7 @@ const renderMap = ({elements, generator, osm3s}) => {
       if (identifier === 'shoes') {
         identifier = 'clothes'
       }
-      
+
       return identifier
     }).filter((prop, index, arr) => {
       return (arr.indexOf(prop) === index)
@@ -83,36 +89,47 @@ const renderMap = ({elements, generator, osm3s}) => {
   let geoJsonLayer = L.geoJSON(features, {
     pointToLayer: (f, coords) => {
       const types = getTypes(f)
-      return L.recyclingMarker(coords, {types: types})
+      return L.recyclingMarker(coords, { types: types, radius: 8 })
     }
   })
 
   const createClusterMarkerIcon = cluster => {
     let childMarkers = cluster.getAllChildMarkers()
-    let clusterTypes = []
+    let typesInCluster = {}
+    let totalTypes = 0;
 
     childMarkers.forEach(child => {
-      let childTypes = getTypes(child.feature)
-      childTypes.forEach(type => {
-        if (clusterTypes.indexOf(type) < 0) {
-          clusterTypes.push(type)
+      let types = getTypes(child.feature)
+      types.forEach(type => {
+        if (!typesInCluster[type]) {
+          typesInCluster[type] = 1
+        } else {
+          typesInCluster[type]++;
         }
+        totalTypes++;
       })
     })
 
-    return L.recyclingIcon({radius: 12, types: clusterTypes})
+    for (let type in typesInCluster) {
+      typesInCluster[type] = typesInCluster[type] / totalTypes
+    }
+
+    return L.recyclingIcon( { radius: 12, types: typesInCluster } )
   }
 
-  let markerCluster = L.markerClusterGroup({
+  let markerCluster = L.markerClusterGroup( {
     iconCreateFunction: createClusterMarkerIcon,
-    disableClusteringAtZoom: 18,
-    showCoverageOnHover: false,
-    spiderfyOnMaxZoom: false
-  })
+    disableClusteringAtZoom: 16,
+    showCoverageOnHover: true,
+    spiderfyOnMaxZoom: false,
+    maxClusterRadius: 60
+  } )
 
-  markerCluster
-    .addLayer(geoJsonLayer)
-    .addTo(recyclingMap)
+  geoJsonLayer.addTo(recyclingMap)
+
+  // markerCluster
+  //   .addLayer(geoJsonLayer)
+  //   .addTo(recyclingMap)
 }
 
 // convert overpass data to geojson spec

@@ -11,7 +11,6 @@ L.SegmentedCircleIcon = L.Icon.extend({
   initialize: function (options) {
     this.options = L.setOptions(this, options)
     this._radius = (this.options.radius) ? this.options.radius : (this.options.iconSize[0] / 2)
-
     if (typeof this.options.segments === 'number') {
       this._segments = this._compileSegments(this.options.segments)
     } else {
@@ -23,23 +22,19 @@ L.SegmentedCircleIcon = L.Icon.extend({
     let segments = []
     for (let i = segmentCount; i > 0; i--) {
       segments.push({
-        className: `segment segment-${i}`
+        className: `segment segment-${i}`,
+        weight: 1 / segmentCount
       })
     }
     return segments;
   },
 
   _createIcon: function (name, oldIcon) {
-    let segmentCount = this._segments.length
-    let segmentLength = 360 / segmentCount
-
-    let startAngle = 0
-    let endAngle = segmentLength
 
     let svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
     svg.setAttribute('width', this.options.iconSize[0])
     svg.setAttribute('height', this.options.iconSize[1])
-  
+
     if (this.options.className) {
       svg.setAttribute('class', this.options.className)
     }
@@ -60,7 +55,14 @@ L.SegmentedCircleIcon = L.Icon.extend({
 
       // generate path for each segment
     } else {
+
+    let startAngle = 0
+    let endAngle = 0
+
       this._segments.forEach((segment) => {
+        segmentLength = segment.weight * 360;
+        endAngle = startAngle + segmentLength;
+
         let path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
         let arc = this._describeArc(
           (this.options.iconSize[0] / 2),
@@ -74,8 +76,7 @@ L.SegmentedCircleIcon = L.Icon.extend({
         path.setAttribute('class', segment.className)
         svg.appendChild(path)
 
-        startAngle = startAngle + segmentLength
-        endAngle = endAngle + segmentLength
+        startAngle = endAngle
       })
     }
 
